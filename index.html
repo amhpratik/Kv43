@@ -37,6 +37,16 @@ button {
 .hidden { display:none }
 .done { color:green; font-weight:bold }
 
+.warning {
+  margin-top:8px;
+  padding:10px;
+  background:#fff3cd;
+  color:#856404;
+  border-radius:6px;
+  font-size:13px;
+}
+.warning strong { font-size:15px; }
+
 .log-header {
   cursor:pointer; display:flex;
   justify-content:space-between; align-items:center;
@@ -51,7 +61,6 @@ button {
 
 <body>
 
-<!-- LOGIN -->
 <div id="loginCard" class="card">
   <h3>Login</h3>
   <input id="uid" placeholder="User ID">
@@ -60,7 +69,6 @@ button {
   <p id="err" style="color:red"></p>
 </div>
 
-<!-- DASHBOARD -->
 <div id="dash" class="hidden">
 
   <div class="header">
@@ -76,21 +84,18 @@ button {
     </div>
   </div>
 
-  <!-- KITCHEN -->
   <div class="card">
     <h3>🍽 Kitchen</h3>
     <div id="kitchenBox"></div>
     <button id="kitchenBtn">Mark Completed</button>
   </div>
 
-  <!-- GARBAGE -->
   <div class="card">
     <h3>🗑 Garbage</h3>
     <p id="garbageText"></p>
     <button id="garbageBtn">Mark Completed</button>
   </div>
 
-  <!-- FINE LOG -->
   <div class="card">
     <div class="log-header" id="fineToggle">
       <h3>💰 Fine Log</h3><span id="fineArrow">▼</span>
@@ -98,7 +103,6 @@ button {
     <div id="fineLog" class="hidden"></div>
   </div>
 
-  <!-- TASK LOG -->
   <div class="card">
     <div class="log-header" id="taskToggle">
       <h3>📜 Task Log</h3><span id="taskArrow">▼</span>
@@ -113,7 +117,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebas
 import { getDatabase, ref, get, set, update, onValue, push } 
 from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 
-/* FIREBASE CONFIG */
+/* FIREBASE */
 const firebaseConfig = {
   apiKey: "AIzaSyClGRnMuCTZTIMXaA41bUEezlFUsfnEr9A",
   authDomain: "mmdb-1794d.firebaseapp.com",
@@ -127,17 +131,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-/* KITCHEN ORDER */
+/* ORDERS */
 const people = ["Vedant","Pratik","Omkar","Yash"];
+const garbageOrder = ["Omkar","Yash","Vedant","Pratik"];
+
 const kitchenBaseDate = new Date("2026-02-02");
 const kitchenBaseIndex = 0;
 
-/* GARBAGE ORDER (SEPARATE) */
-const garbageOrder = ["Omkar","Yash","Vedant","Pratik"];
-
 let currentUser = localStorage.getItem("user");
 
-/* AUTO LOGIN */
 if(currentUser) showDashboard();
 
 /* LOGIN */
@@ -188,18 +190,28 @@ function handleKitchen(){
          Next : <b>${nextPerson}</b>`;
       kitchenBtn.style.display="none";
     }else{
-      kitchenBox.innerHTML=
-        `Assigned : <b>${assigned}</b>`;
-      kitchenBtn.style.display=
-        assigned.toLowerCase()===currentUser?"block":"none";
+
+      if(assigned.toLowerCase()===currentUser){
+
+        kitchenBox.innerHTML=
+          `Assigned : <b>${assigned}</b>
+           <div class="warning" id="countdownBox"></div>`;
+
+        kitchenBtn.style.display="block";
+        startCountdown();
+
+      }else{
+        kitchenBox.innerHTML=
+          `Assigned : <b>${assigned}</b>`;
+        kitchenBtn.style.display="none";
+      }
     }
   });
 
   kitchenBtn.onclick=async()=>{
     const now=new Date();
     await set(kitchenRef,{
-      assigned,
-      done:true,
+      assigned, done:true,
       doneBy:profileName.innerText
     });
     await push(ref(db,"taskLog"),{
@@ -209,6 +221,38 @@ function handleKitchen(){
       time:now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
     });
   };
+}
+
+/* COUNTDOWN */
+function startCountdown(){
+  const box=document.getElementById("countdownBox");
+  if(!box)return;
+
+  function updateCountdown(){
+    const now=new Date();
+    const deadline=new Date();
+    deadline.setDate(deadline.getDate()+1);
+    deadline.setHours(12,0,0,0);
+    const diff=deadline-now;
+
+    if(diff<=0){
+      box.innerHTML=
+        `⚠ <strong>Deadline passed!</strong><br>
+         Fine may be applied.`;
+      return;
+    }
+
+    const hrs=Math.floor(diff/(1000*60*60));
+    const mins=Math.floor((diff%(1000*60*60))/(1000*60));
+
+    box.innerHTML=
+      `⚠ Complete your task in 
+       <strong>${hrs} hrs ${mins} min</strong><br>
+       Otherwise ₹50 fine will be applied.`;
+  }
+
+  updateCountdown();
+  setInterval(updateCountdown,60000);
 }
 
 /* GARBAGE */
