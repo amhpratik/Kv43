@@ -6,74 +6,46 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background:#f4f6f8;
-  padding:15px;
-}
+body { font-family: Arial; background:#f4f6f8; padding:15px; }
+
 .header {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  background:#fff;
-  padding:15px;
-  border-radius:10px;
-  margin-bottom:15px;
+  display:flex; justify-content:space-between; align-items:center;
+  background:#fff; padding:15px; border-radius:10px; margin-bottom:15px;
   font-weight:bold;
 }
-.header-right {
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
+.header-right { display:flex; align-items:center; gap:12px; }
 
-/* MENU */
 .menu { position:relative }
-#menuBtn { font-size:20px; cursor:pointer }
+#menuBtn { font-size:20px; cursor:pointer; }
 .menu-box {
-  position:absolute;
-  right:0;
-  top:28px;
-  background:white;
-  border-radius:6px;
+  position:absolute; right:0; top:28px;
+  background:white; border-radius:6px;
   box-shadow:0 4px 12px rgba(0,0,0,0.15);
   min-width:100px;
 }
-.menu-box div {
-  padding:10px;
-  cursor:pointer;
-}
+.menu-box div { padding:10px; cursor:pointer; }
 .menu-box div:hover { background:#f2f2f2 }
 
 .card {
-  background:white;
-  padding:20px;
-  margin-bottom:15px;
-  border-radius:10px;
+  background:white; padding:20px;
+  margin-bottom:15px; border-radius:10px;
 }
 button {
-  padding:10px 16px;
-  border:none;
-  border-radius:6px;
-  background:#4caf50;
-  color:white;
+  padding:10px 16px; border:none;
+  border-radius:6px; background:#4caf50; color:white;
 }
 .hidden { display:none }
 .done { color:green; font-weight:bold }
 
 .log-header {
-  cursor:pointer;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
+  cursor:pointer; display:flex;
+  justify-content:space-between; align-items:center;
 }
 .log-row {
-  padding:6px 0;
-  border-bottom:1px solid #eee;
+  padding:6px 0; border-bottom:1px solid #eee;
   font-size:14px;
 }
 .log-row:last-child { border-bottom:none }
-.small { font-size:13px; color:#666 }
 </style>
 </head>
 
@@ -91,7 +63,6 @@ button {
 <!-- DASHBOARD -->
 <div id="dash" class="hidden">
 
-  <!-- HEADER -->
   <div class="header">
     <div id="profileName"></div>
     <div class="header-right">
@@ -139,9 +110,10 @@ button {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getDatabase, ref, get, set, update, onValue, push } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+import { getDatabase, ref, get, set, update, onValue, push } 
+from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 
-/* FIREBASE */
+/* FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyClGRnMuCTZTIMXaA41bUEezlFUsfnEr9A",
   authDomain: "mmdb-1794d.firebaseapp.com",
@@ -155,33 +127,39 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+/* KITCHEN ORDER */
 const people = ["Vedant","Pratik","Omkar","Yash"];
 const kitchenBaseDate = new Date("2026-02-02");
 const kitchenBaseIndex = 0;
 
+/* GARBAGE ORDER (SEPARATE) */
+const garbageOrder = ["Omkar","Yash","Vedant","Pratik"];
+
 let currentUser = localStorage.getItem("user");
 
 /* AUTO LOGIN */
-if (currentUser) showDashboard();
+if(currentUser) showDashboard();
 
 /* LOGIN */
-loginBtn.onclick = async () => {
-  const snap = await get(ref(db, "users/" + uid.value.toLowerCase()));
-  if (!snap.exists() || snap.val().pass !== pwd.value) {
-    err.innerText = "Invalid login"; return;
+loginBtn.onclick = async()=>{
+  const id = uid.value.toLowerCase();
+  const snap = await get(ref(db,"users/"+id));
+  if(!snap.exists() || snap.val().pass !== pwd.value){
+    err.innerText="Invalid login"; return;
   }
-  currentUser = uid.value.toLowerCase();
-  localStorage.setItem("user", currentUser);
+  currentUser=id;
+  localStorage.setItem("user",id);
   showDashboard();
 };
 
-function showDashboard() {
+function showDashboard(){
   loginCard.classList.add("hidden");
   dash.classList.remove("hidden");
-  profileName.innerText =
-    currentUser.charAt(0).toUpperCase() + currentUser.slice(1);
 
-  onValue(ref(db,"users/"+currentUser+"/fine"), s=>{
+  profileName.innerText =
+    currentUser.charAt(0).toUpperCase()+currentUser.slice(1);
+
+  onValue(ref(db,"users/"+currentUser+"/fine"),s=>{
     fineBox.innerText="₹"+(s.val()||0);
   });
 
@@ -189,24 +167,29 @@ function showDashboard() {
   handleGarbage();
   handleFineLog();
   handleTaskLog();
+  checkFine();
 }
 
 /* KITCHEN */
-function handleKitchen() {
+function handleKitchen(){
   const today=new Date();
   const dateStr=today.toISOString().split("T")[0];
   const diff=Math.floor((today-kitchenBaseDate)/(1000*60*60*24));
   const index=(kitchenBaseIndex+diff)%people.length;
   const assigned=people[index];
+  const nextPerson=people[(index+1)%people.length];
   const kitchenRef=ref(db,"kitchen/"+dateStr);
 
   onValue(kitchenRef,s=>{
     const d=s.val();
     if(d?.done){
-      kitchenBox.innerHTML=`${d.doneBy} : DONE ✅`;
+      kitchenBox.innerHTML=
+        `<b>${d.doneBy}</b> : DONE ✅<br>
+         Next : <b>${nextPerson}</b>`;
       kitchenBtn.style.display="none";
-    } else {
-      kitchenBox.innerHTML=`Assigned: <b>${assigned}</b>`;
+    }else{
+      kitchenBox.innerHTML=
+        `Assigned : <b>${assigned}</b>`;
       kitchenBtn.style.display=
         assigned.toLowerCase()===currentUser?"block":"none";
     }
@@ -231,16 +214,18 @@ function handleKitchen() {
 /* GARBAGE */
 function handleGarbage(){
   onValue(ref(db,"garbage/index"),s=>{
-    const p=people[s.val()??0];
-    garbageText.innerHTML=`Current turn: <b>${p}</b>`;
+    const index=s.val()??0;
+    const person=garbageOrder[index];
+    garbageText.innerHTML=`Current turn: <b>${person}</b>`;
     garbageBtn.style.display=
-      p.toLowerCase()===currentUser?"block":"none";
+      person.toLowerCase()===currentUser?"block":"none";
   });
 
   garbageBtn.onclick=async()=>{
     const now=new Date();
     const s=await get(ref(db,"garbage/index"));
-    await set(ref(db,"garbage/index"),((s.val()??0)+1)%people.length);
+    const next=((s.val()??0)+1)%garbageOrder.length;
+    await set(ref(db,"garbage/index"),next);
     await push(ref(db,"taskLog"),{
       user:profileName.innerText,
       task:"Garbage",
@@ -254,14 +239,17 @@ function handleGarbage(){
 function handleFineLog(){
   fineToggle.onclick=()=>{
     fineLog.classList.toggle("hidden");
-    fineArrow.innerText=fineLog.classList.contains("hidden")?"▼":"▲";
+    fineArrow.innerText=
+      fineLog.classList.contains("hidden")?"▼":"▲";
   };
   onValue(ref(db,"users"),s=>{
     fineLog.innerHTML="";
     const u=s.val()||{};
     Object.keys(u).forEach(x=>{
       fineLog.innerHTML+=
-        `<div class="log-row">${x} : ₹${u[x].fine||0}</div>`;
+        `<div class="log-row">
+         ${x.charAt(0).toUpperCase()+x.slice(1)} : ₹${u[x].fine||0}
+         </div>`;
     });
   });
 }
@@ -270,7 +258,8 @@ function handleFineLog(){
 function handleTaskLog(){
   taskToggle.onclick=()=>{
     taskLog.classList.toggle("hidden");
-    taskArrow.innerText=taskLog.classList.contains("hidden")?"▼":"▲";
+    taskArrow.innerText=
+      taskLog.classList.contains("hidden")?"▼":"▲";
   };
   onValue(ref(db,"taskLog"),s=>{
     taskLog.innerHTML="";
@@ -283,6 +272,26 @@ function handleTaskLog(){
          </div>`;
     });
   });
+}
+
+/* FINE CHECK */
+async function checkFine(){
+  const now=new Date();
+  if(now.getHours()<12)return;
+
+  const y=new Date();
+  y.setDate(y.getDate()-1);
+  const yStr=y.toISOString().split("T")[0];
+  const snap=await get(ref(db,"kitchen/"+yStr));
+  if(!snap.exists())return;
+
+  const d=snap.val();
+  if(d.done||d.fineAdded)return;
+
+  const fineRef=ref(db,"users/"+d.assigned.toLowerCase()+"/fine");
+  const f=await get(fineRef);
+  await set(fineRef,(f.val()||0)+50);
+  await update(ref(db,"kitchen/"+yStr),{fineAdded:true});
 }
 
 /* MENU */
