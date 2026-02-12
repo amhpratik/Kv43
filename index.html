@@ -131,15 +131,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-/* ORDERS */
 const people = ["Vedant","Pratik","Omkar","Yash"];
 const garbageOrder = ["Omkar","Yash","Vedant","Pratik"];
 
-const kitchenBaseDate = new Date("2026-02-02");
-const kitchenBaseIndex = 0;
-
 let currentUser = localStorage.getItem("user");
-
 if(currentUser) showDashboard();
 
 /* LOGIN */
@@ -176,17 +171,39 @@ function showDashboard(){
 function handleKitchen(){
   const today=new Date();
   const dateStr=today.toISOString().split("T")[0];
-  const diff=Math.floor((today-kitchenBaseDate)/(1000*60*60*24));
-  const index=(kitchenBaseIndex+diff)%people.length;
-  const assigned=people[index];
-  const nextPerson=people[(index+1)%people.length];
   const kitchenRef=ref(db,"kitchen/"+dateStr);
 
-  onValue(kitchenRef,s=>{
-    const d=s.val();
-    if(d?.done){
+  onValue(kitchenRef, async (snap)=>{
+
+    let data = snap.val();
+
+    if(!data){
+      const lastSnap = await get(ref(db,"kitchen"));
+      let assigned = people[0];
+
+      if(lastSnap.exists()){
+        const keys = Object.keys(lastSnap.val()).sort();
+        const last = lastSnap.val()[keys[keys.length-1]];
+        const index = people.indexOf(last.assigned);
+        assigned = people[(index+1)%people.length];
+      }
+
+      await set(kitchenRef,{
+        assigned,
+        done:false,
+        fineAdded:false
+      });
+
+      data = {assigned, done:false};
+    }
+
+    const assigned = data.assigned;
+    const currentIndex = people.indexOf(assigned);
+    const nextPerson = people[(currentIndex+1)%people.length];
+
+    if(data.done){
       kitchenBox.innerHTML=
-        `<b>${d.doneBy}</b> : DONE ✅<br>
+        `<b>${data.doneBy}</b> : DONE ✅<br>
          Next : <b>${nextPerson}</b>`;
       kitchenBtn.style.display="none";
     }else{
@@ -210,8 +227,8 @@ function handleKitchen(){
 
   kitchenBtn.onclick=async()=>{
     const now=new Date();
-    await set(kitchenRef,{
-      assigned, done:true,
+    await update(kitchenRef,{
+      done:true,
       doneBy:profileName.innerText
     });
     await push(ref(db,"taskLog"),{
