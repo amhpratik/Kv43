@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Home Task Manager</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background:#f4f6f8;
+  padding:15px;
+}
+.header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:#fff;
+  padding:15px;
+  border-radius:10px;
+  margin-bottom:15px;
+  font-weight:bold;
+}
+.header-right {
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+/* MENU */
+.menu { position:relative }
+#menuBtn { font-size:20px; cursor:pointer }
+.menu-box {
+  position:absolute;
+  right:0;
+  top:28px;
+  background:white;
+  border-radius:6px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+  min-width:100px;
+}
+.menu-box div {
+  padding:10px;
+  cursor:pointer;
+}
+.menu-box div:hover { background:#f2f2f2 }
+
+.card {
+  background:white;
+  padding:20px;
+  margin-bottom:15px;
+  border-radius:10px;
+}
+button {
+  padding:10px 16px;
+  border:none;
+  border-radius:6px;
+  background:#4caf50;
+  color:white;
+}
+.hidden { display:none }
+.done { color:green; font-weight:bold }
+
+.log-header {
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.log-row {
+  padding:6px 0;
+  border-bottom:1px solid #eee;
+  font-size:14px;
+}
+.log-row:last-child { border-bottom:none }
+.small { font-size:13px; color:#666 }
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="loginCard" class="card">
+  <h3>Login</h3>
+  <input id="uid" placeholder="User ID">
+  <input id="pwd" type="password" placeholder="Password">
+  <button id="loginBtn">Login</button>
+  <p id="err" style="color:red"></p>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dash" class="hidden">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div id="profileName"></div>
+    <div class="header-right">
+      <div id="fineBox">₹0</div>
+      <div class="menu">
+        <div id="menuBtn">⋮</div>
+        <div id="menuBox" class="menu-box hidden">
+          <div id="logoutBtn">Logout</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KITCHEN -->
+  <div class="card">
+    <h3>🍽 Kitchen</h3>
+    <div id="kitchenBox"></div>
+    <button id="kitchenBtn">Mark Completed</button>
+  </div>
+
+  <!-- GARBAGE -->
+  <div class="card">
+    <h3>🗑 Garbage</h3>
+    <p id="garbageText"></p>
+    <button id="garbageBtn">Mark Completed</button>
+  </div>
+
+  <!-- FINE LOG -->
+  <div class="card">
+    <div class="log-header" id="fineToggle">
+      <h3>💰 Fine Log</h3><span id="fineArrow">▼</span>
+    </div>
+    <div id="fineLog" class="hidden"></div>
+  </div>
+
+  <!-- TASK LOG -->
+  <div class="card">
+    <div class="log-header" id="taskToggle">
+      <h3>📜 Task Log</h3><span id="taskArrow">▼</span>
+    </div>
+    <div id="taskLog" class="hidden"></div>
+  </div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import { getDatabase, ref, get, set, update, onValue, push } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+
+/* FIREBASE */
+const firebaseConfig = {
+  apiKey: "AIzaSyClGRnMuCTZTIMXaA41bUEezlFUsfnEr9A",
+  authDomain: "mmdb-1794d.firebaseapp.com",
+  databaseURL: "https://mmdb-1794d-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "mmdb-1794d",
+  storageBucket: "mmdb-1794d.firebasestorage.app",
+  messagingSenderId: "44201873441",
+  appId: "1:44201873441:web:9cc69a907717eca1b79360"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const people = ["Vedant","Pratik","Omkar","Yash"];
+const kitchenBaseDate = new Date("2026-02-02");
+const kitchenBaseIndex = 0;
+
+let currentUser = localStorage.getItem("user");
+
+/* AUTO LOGIN */
+if (currentUser) showDashboard();
+
+/* LOGIN */
+loginBtn.onclick = async () => {
+  const snap = await get(ref(db, "users/" + uid.value.toLowerCase()));
+  if (!snap.exists() || snap.val().pass !== pwd.value) {
+    err.innerText = "Invalid login"; return;
+  }
+  currentUser = uid.value.toLowerCase();
+  localStorage.setItem("user", currentUser);
+  showDashboard();
+};
+
+function showDashboard() {
+  loginCard.classList.add("hidden");
+  dash.classList.remove("hidden");
+  profileName.innerText =
+    currentUser.charAt(0).toUpperCase() + currentUser.slice(1);
+
+  onValue(ref(db,"users/"+currentUser+"/fine"), s=>{
+    fineBox.innerText="₹"+(s.val()||0);
+  });
+
+  handleKitchen();
+  handleGarbage();
+  handleFineLog();
+  handleTaskLog();
+}
+
+/* KITCHEN */
+function handleKitchen() {
+  const today=new Date();
+  const dateStr=today.toISOString().split("T")[0];
+  const diff=Math.floor((today-kitchenBaseDate)/(1000*60*60*24));
+  const index=(kitchenBaseIndex+diff)%people.length;
+  const assigned=people[index];
+  const kitchenRef=ref(db,"kitchen/"+dateStr);
+
+  onValue(kitchenRef,s=>{
+    const d=s.val();
+    if(d?.done){
+      kitchenBox.innerHTML=`${d.doneBy} : DONE ✅`;
+      kitchenBtn.style.display="none";
+    } else {
+      kitchenBox.innerHTML=`Assigned: <b>${assigned}</b>`;
+      kitchenBtn.style.display=
+        assigned.toLowerCase()===currentUser?"block":"none";
+    }
+  });
+
+  kitchenBtn.onclick=async()=>{
+    const now=new Date();
+    await set(kitchenRef,{
+      assigned,
+      done:true,
+      doneBy:profileName.innerText
+    });
+    await push(ref(db,"taskLog"),{
+      user:profileName.innerText,
+      task:"Kitchen",
+      date:dateStr,
+      time:now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+    });
+  };
+}
+
+/* GARBAGE */
+function handleGarbage(){
+  onValue(ref(db,"garbage/index"),s=>{
+    const p=people[s.val()??0];
+    garbageText.innerHTML=`Current turn: <b>${p}</b>`;
+    garbageBtn.style.display=
+      p.toLowerCase()===currentUser?"block":"none";
+  });
+
+  garbageBtn.onclick=async()=>{
+    const now=new Date();
+    const s=await get(ref(db,"garbage/index"));
+    await set(ref(db,"garbage/index"),((s.val()??0)+1)%people.length);
+    await push(ref(db,"taskLog"),{
+      user:profileName.innerText,
+      task:"Garbage",
+      date:new Date().toISOString().split("T")[0],
+      time:now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+    });
+  };
+}
+
+/* FINE LOG */
+function handleFineLog(){
+  fineToggle.onclick=()=>{
+    fineLog.classList.toggle("hidden");
+    fineArrow.innerText=fineLog.classList.contains("hidden")?"▼":"▲";
+  };
+  onValue(ref(db,"users"),s=>{
+    fineLog.innerHTML="";
+    const u=s.val()||{};
+    Object.keys(u).forEach(x=>{
+      fineLog.innerHTML+=
+        `<div class="log-row">${x} : ₹${u[x].fine||0}</div>`;
+    });
+  });
+}
+
+/* TASK LOG */
+function handleTaskLog(){
+  taskToggle.onclick=()=>{
+    taskLog.classList.toggle("hidden");
+    taskArrow.innerText=taskLog.classList.contains("hidden")?"▼":"▲";
+  };
+  onValue(ref(db,"taskLog"),s=>{
+    taskLog.innerHTML="";
+    const data=s.val()||{};
+    Object.values(data).reverse().forEach(e=>{
+      taskLog.innerHTML+=
+        `<div class="log-row">
+         <b>${e.user}</b> ${e.task==="Kitchen"?"cleaned kitchen":"threw garbage"}
+         on ${e.date} at ${e.time}
+         </div>`;
+    });
+  });
+}
+
+/* MENU */
+menuBtn.onclick=()=>menuBox.classList.toggle("hidden");
+document.addEventListener("click",e=>{
+  if(!e.target.closest(".menu"))menuBox.classList.add("hidden");
+});
+logoutBtn.onclick=()=>{
+  localStorage.removeItem("user");
+  location.reload();
+};
+</script>
+
+</body>
+</html>
