@@ -117,7 +117,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebas
 import { getDatabase, ref, get, set, update, onValue, push } 
 from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 
-/* FIREBASE */
 const firebaseConfig = {
   apiKey: "AIzaSyClGRnMuCTZTIMXaA41bUEezlFUsfnEr9A",
   authDomain: "mmdb-1794d.firebaseapp.com",
@@ -167,25 +166,38 @@ function showDashboard(){
   checkFine();
 }
 
-/* KITCHEN */
+/* =========================
+   KITCHEN (COMPLETION BASED)
+========================= */
 function handleKitchen(){
-  const today=new Date();
-  const dateStr=today.toISOString().split("T")[0];
-  const kitchenRef=ref(db,"kitchen/"+dateStr);
+
+  const today = new Date();
+  const dateStr = today.toISOString().split("T")[0];
+  const kitchenRef = ref(db,"kitchen/"+dateStr);
 
   onValue(kitchenRef, async (snap)=>{
 
     let data = snap.val();
 
     if(!data){
-      const lastSnap = await get(ref(db,"kitchen"));
-      let assigned = people[0];
 
-      if(lastSnap.exists()){
-        const keys = Object.keys(lastSnap.val()).sort();
-        const last = lastSnap.val()[keys[keys.length-1]];
-        const index = people.indexOf(last.assigned);
-        assigned = people[(index+1)%people.length];
+      const y = new Date();
+      y.setDate(y.getDate()-1);
+      const yStr = y.toISOString().split("T")[0];
+      const ySnap = await get(ref(db,"kitchen/"+yStr));
+
+      let assigned;
+
+      if(ySnap.exists()){
+        const yData = ySnap.val();
+        if(!yData.done){
+          assigned = yData.assigned; // continue same person
+        }else{
+          const index = people.indexOf(yData.assigned);
+          assigned = people[(index+1)%people.length];
+        }
+      }else{
+        assigned = people[0];
       }
 
       await set(kitchenRef,{
@@ -202,7 +214,7 @@ function handleKitchen(){
     const nextPerson = people[(currentIndex+1)%people.length];
 
     if(data.done){
-      kitchenBox.innerHTML=
+      kitchenBox.innerHTML =
         `<b>${data.doneBy}</b> : DONE ✅<br>
          Next : <b>${nextPerson}</b>`;
       kitchenBtn.style.display="none";
@@ -210,7 +222,7 @@ function handleKitchen(){
 
       if(assigned.toLowerCase()===currentUser){
 
-        kitchenBox.innerHTML=
+        kitchenBox.innerHTML =
           `Assigned : <b>${assigned}</b>
            <div class="warning" id="countdownBox"></div>`;
 
@@ -218,19 +230,20 @@ function handleKitchen(){
         startCountdown();
 
       }else{
-        kitchenBox.innerHTML=
+        kitchenBox.innerHTML =
           `Assigned : <b>${assigned}</b>`;
         kitchenBtn.style.display="none";
       }
     }
   });
 
-  kitchenBtn.onclick=async()=>{
-    const now=new Date();
+  kitchenBtn.onclick = async ()=>{
+    const now = new Date();
     await update(kitchenRef,{
       done:true,
       doneBy:profileName.innerText
     });
+
     await push(ref(db,"taskLog"),{
       user:profileName.innerText,
       task:"Kitchen",
@@ -253,7 +266,7 @@ function startCountdown(){
     const diff=deadline-now;
 
     if(diff<=0){
-      box.innerHTML=
+      box.innerHTML =
         `⚠ <strong>Deadline passed!</strong><br>
          Fine may be applied.`;
       return;
@@ -262,7 +275,7 @@ function startCountdown(){
     const hrs=Math.floor(diff/(1000*60*60));
     const mins=Math.floor((diff%(1000*60*60))/(1000*60));
 
-    box.innerHTML=
+    box.innerHTML =
       `⚠ Complete your task in 
        <strong>${hrs} hrs ${mins} min</strong><br>
        Otherwise ₹50 fine will be applied.`;
