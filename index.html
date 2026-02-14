@@ -262,28 +262,18 @@ function handleKitchen(){
   const now = new Date();
   const todayStr = now.toISOString().split("T")[0];
 
-  const y = new Date();
-  y.setDate(y.getDate()-1);
-  const yStr = y.toISOString().split("T")[0];
+  await update(ref(db,"kitchen/"+todayStr),{
+    done:true,
+    doneBy:profileName.innerText
+  });
 
-  const yRef = ref(db,"kitchen/"+yStr);
-  const todayRef = ref(db,"kitchen/"+todayStr);
-
-  const ySnap = await get(yRef);
-
-  let rotatedToday = false;
-
-  // If yesterday exists and was not done → mark done & rotate
-  if(ySnap.exists()){
-    const yData = ySnap.val();
-
-    if(!yData.done){
-
-      // Mark yesterday done
-      await update(yRef,{
-        done:true,
-        doneBy:profileName.innerText
-      });
+  await push(ref(db,"taskLog"),{
+    user:profileName.innerText,
+    task:"Kitchen",
+    date:todayStr,
+    time:now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+  });
+};
 
       // Rotate today's assignment
       const index = people.indexOf(yData.assigned);
