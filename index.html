@@ -274,37 +274,8 @@ function handleKitchen(){
     time:now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
   });
 };
-
-      // Rotate today's assignment
-      const index = people.indexOf(yData.assigned);
-      const nextPerson = people[(index+1)%people.length];
-
-      await set(todayRef,{
-        assigned: nextPerson,
-        done:false,
-        fineAdded:false
-      });
-
-      rotatedToday = true;
-    }
-  }
-
-  // If NOT carry-over case → just mark today done
-  if(!rotatedToday){
-    await update(todayRef,{
-      done:true,
-      doneBy:profileName.innerText
-    });
-  }
-
-  await push(ref(db,"taskLog"),{
-    user:profileName.innerText,
-    task:"Kitchen",
-    date:todayStr,
-    time:now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
-  });
-};
 }
+
 
 /* COUNTDOWN */
 function startCountdown(taskDate){
