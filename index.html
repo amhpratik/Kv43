@@ -214,11 +214,31 @@ function handleKitchen(){
     const nextPerson = people[(currentIndex+1)%people.length];
 
     if(data.done){
-      kitchenBox.innerHTML =
-        `<b>${data.doneBy}</b> : DONE ✅<br>
-         Next : <b>${nextPerson}</b>`;
-      kitchenBtn.style.display="none";
-    }else{
+
+  const now = new Date();
+
+  const deadline = new Date();
+  deadline.setHours(12,0,0,0);
+
+  // If current time is AFTER 12 PM
+  if(now > deadline){
+
+    // After 12 PM → treat as new day
+    kitchenBox.innerHTML =
+      `Assigned : <b>${nextPerson}</b>`;
+    kitchenBtn.style.display =
+      nextPerson.toLowerCase()===currentUser ? "block" : "none";
+
+  }else{
+
+    // Before 12 PM → show done
+    kitchenBox.innerHTML =
+      `<b>${data.doneBy}</b> : DONE ✅`;
+    kitchenBtn.style.display="none";
+  }
+
+  return;
+  }else{
 
       if(assigned.toLowerCase()===currentUser){
 
