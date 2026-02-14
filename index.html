@@ -227,7 +227,7 @@ function handleKitchen(){
            <div class="warning" id="countdownBox"></div>`;
 
         kitchenBtn.style.display="block";
-        startCountdown();
+        startCountdown(dateStr);
 
       }else{
         kitchenBox.innerHTML =
@@ -254,35 +254,51 @@ function handleKitchen(){
 }
 
 /* COUNTDOWN */
-function startCountdown(){
-  const box=document.getElementById("countdownBox");
-  if(!box)return;
+function startCountdown(taskDate){
+
+  const box = document.getElementById("countdownBox");
+  if(!box) return;
 
   function updateCountdown(){
-    const now=new Date();
-    const deadline=new Date();
-    deadline.setDate(deadline.getDate()+1);
-    deadline.setHours(12,0,0,0);
-    const diff=deadline-now;
 
-    if(diff<=0){
+    const now = new Date();
+
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+
+    const deadline = new Date();
+
+    if(taskDate === todayStr){
+      // Task assigned today → deadline tomorrow 12:00
+      deadline.setDate(deadline.getDate()+1);
+    }
+    // else → carried from yesterday → deadline today 12:00
+
+    deadline.setHours(12,0,0,0); // 24-hour clock
+
+    const diff = deadline - now;
+
+    if(diff <= 0){
       box.innerHTML =
         `⚠ <strong>Deadline passed!</strong><br>
          Fine may be applied.`;
       return;
     }
 
-    const hrs=Math.floor(diff/(1000*60*60));
-    const mins=Math.floor((diff%(1000*60*60))/(1000*60));
+    const hrs = Math.floor(diff / (1000*60*60));
+    const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
+
+    const dayText = (taskDate === todayStr) ? "Tomorrow" : "Today";
 
     box.innerHTML =
       `⚠ Complete your task in 
        <strong>${hrs} hrs ${mins} min</strong><br>
+       Deadline: <strong>${dayText} 12:00</strong> (24-hour format)<br>
        Otherwise ₹50 fine will be applied.`;
   }
 
   updateCountdown();
-  setInterval(updateCountdown,60000);
+  setInterval(updateCountdown, 60000);
 }
 
 /* GARBAGE */
