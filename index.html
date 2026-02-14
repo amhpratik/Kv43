@@ -238,20 +238,40 @@ function handleKitchen(){
   });
 
   kitchenBtn.onclick = async ()=>{
-    const now = new Date();
-    await update(kitchenRef,{
-      done:true,
-      doneBy:profileName.innerText
-    });
 
-    await push(ref(db,"taskLog"),{
-      user:profileName.innerText,
-      task:"Kitchen",
-      date:dateStr,
-      time:now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
-    });
-  };
-}
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+
+  const y = new Date();
+  y.setDate(y.getDate()-1);
+  const yStr = y.toISOString().split("T")[0];
+
+  const ySnap = await get(ref(db,"kitchen/"+yStr));
+
+  // If yesterday exists and was not done → mark it done too
+  if(ySnap.exists()){
+    const yData = ySnap.val();
+    if(!yData.done){
+      await update(ref(db,"kitchen/"+yStr),{
+        done:true,
+        doneBy:profileName.innerText
+      });
+    }
+  }
+
+  // Mark today as done
+  await update(ref(db,"kitchen/"+todayStr),{
+    done:true,
+    doneBy:profileName.innerText
+  });
+
+  await push(ref(db,"taskLog"),{
+    user:profileName.innerText,
+    task:"Kitchen",
+    date:todayStr,
+    time:now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+  });
+};
 
 /* COUNTDOWN */
 function startCountdown(taskDate){
