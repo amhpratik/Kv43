@@ -246,24 +246,46 @@ function handleKitchen(){
   y.setDate(y.getDate()-1);
   const yStr = y.toISOString().split("T")[0];
 
-  const ySnap = await get(ref(db,"kitchen/"+yStr));
+  const yRef = ref(db,"kitchen/"+yStr);
+  const todayRef = ref(db,"kitchen/"+todayStr);
 
-  // If yesterday exists and was not done → mark it done too
+  const ySnap = await get(yRef);
+
+  let rotatedToday = false;
+
+  // If yesterday exists and was not done → mark done & rotate
   if(ySnap.exists()){
     const yData = ySnap.val();
+
     if(!yData.done){
-      await update(ref(db,"kitchen/"+yStr),{
+
+      // Mark yesterday done
+      await update(yRef,{
         done:true,
         doneBy:profileName.innerText
       });
+
+      // Rotate today's assignment
+      const index = people.indexOf(yData.assigned);
+      const nextPerson = people[(index+1)%people.length];
+
+      await set(todayRef,{
+        assigned: nextPerson,
+        done:false,
+        fineAdded:false
+      });
+
+      rotatedToday = true;
     }
   }
 
-  // Mark today as done
-  await update(ref(db,"kitchen/"+todayStr),{
-    done:true,
-    doneBy:profileName.innerText
-  });
+  // If NOT carry-over case → just mark today done
+  if(!rotatedToday){
+    await update(todayRef,{
+      done:true,
+      doneBy:profileName.innerText
+    });
+  }
 
   await push(ref(db,"taskLog"),{
     user:profileName.innerText,
