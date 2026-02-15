@@ -172,124 +172,122 @@ function showDashboard(){
 function handleKitchen(){
 
   const today = new Date();
-  const dateStr = today.toISOString().split("T")[0];
-  const kitchenRef = ref(db,"kitchen/"+dateStr);
-
-  onValue(kitchenRef, async (snap)=>{
-
-    let data = snap.val();
-
-    if(!data){
-
-      const y = new Date();
-      y.setDate(y.getDate()-1);
-      const yStr = y.toISOString().split("T")[0];
-      const ySnap = await get(ref(db,"kitchen/"+yStr));
-
-      let assigned;
-
-      if(ySnap.exists()){
-        const yData = ySnap.val();
-        if(!yData.done){
-          assigned = yData.assigned; // continue same person
-        }else{
-          const index = people.indexOf(yData.assigned);
-          assigned = people[(index+1)%people.length];
-        }
-      }else{
-        assigned = people[0];
-      }
-
-      await set(kitchenRef,{
-        assigned,
-        done:false,
-        fineAdded:false
-      });
-
-      data = {assigned, done:false};
-    }
-
-    const assigned = data.assigned;
-    const currentIndex = people.indexOf(assigned);
-    const nextPerson = people[(currentIndex+1)%people.length];
-
-    if(data.done){
-
-  const now = new Date();
-
-  const deadline = new Date();
-  deadline.setHours(12,0,0,0);
-
-  // If current time is AFTER 12 PM
-  if(now > deadline){
-
-    // After 12 PM → treat as new day
-    kitchenBox.innerHTML =
-      `Assigned : <b>${nextPerson}</b>`;
-    kitchenBtn.style.display =
-      nextPerson.toLowerCase()===currentUser ? "block" : "none";
-
-  }else{
-
-    // Before 12 PM → show done
-    kitchenBox.innerHTML =
-      `<b>${data.doneBy}</b> : DONE ✅`;
-    kitchenBtn.style.display="none";
-  }
-
-  return;
-  }else{
-
-      if(assigned.toLowerCase()===currentUser){
-
-        kitchenBox.innerHTML =
-          `Assigned : <b>${assigned}</b>
-           <div class="warning" id="countdownBox"></div>`;
-
-        kitchenBtn.style.display="block";
-        startCountdown(dateStr);
-
-      }else{
-        kitchenBox.innerHTML =
-          `Assigned : <b>${assigned}</b>`;
-        kitchenBtn.style.display="none";
-      }
-    }
-  });
-
-  kitchenBtn.onclick = async ()=>{
-
-  const now = new Date();
-  const todayStr = now.toISOString().split("T")[0];
+  const todayStr = today.toISOString().split("T")[0];
 
   const y = new Date();
   y.setDate(y.getDate()-1);
   const yStr = y.toISOString().split("T")[0];
 
-  const ySnap = await get(ref(db,"kitchen/"+yStr));
+  const todayRef = ref(db,"kitchen/"+todayStr);
+  const yRef = ref(db,"kitchen/"+yStr);
 
-  let targetDate = todayStr;
+  onValue(ref(db,"kitchen"), async (snap)=>{
 
-  // If yesterday exists and not done → mark yesterday instead
-  if(ySnap.exists()){
-    const yData = ySnap.val();
-    if(!yData.done){
-      targetDate = yStr;
+    const allData = snap.val() || {};
+    const todayData = allData[todayStr];
+    const yData = allData[yStr];
+
+    let activeData;
+    let activeDate;
+
+    // If yesterday unfinished → it is still active
+    if(yData && !yData.done){
+      activeData = yData;
+      activeDate = yStr;
+    } else {
+      activeData = todayData;
+      activeDate = todayStr;
     }
-  }
 
-  await update(ref(db,"kitchen/"+targetDate),{
-    done:true,
-    doneBy:profileName.innerText
+    if(!activeData){
+      // Create new assignment
+      let assigned = people[0];
+
+      if(yData && yData.done){
+        const index = people.indexOf(yData.assigned);
+        assigned = people[(index+1)%people.length];
+      }
+
+      await set(todayRef,{
+        assigned,
+        done:false,
+        fineAdded:false
+      });
+
+      return;
+    }
+
+    const assigned = activeData.assigned;
+    const currentIndex = people.indexOf(assigned);
+    const nextPerson = people[(currentIndex+1)%people.length];
+
+    if(activeData.done){
+
+      const now = new Date();
+      const deadline = new Date();
+      deadline.setHours(12,0,0,0);
+
+      if(now >= deadline){
+        kitchenBox.innerHTML =
+          `Assigned : <b>${nextPerson}</b>`;
+        kitchenBtn.style.display =
+          nextPerson.toLowerCase()===currentUser ? "block" : "none";
+      } else {
+        kitchenBox.innerHTML =
+          `<b>${activeData.doneBy}</b> : DONE ✅`;
+        kitchenBtn.style.display="none";
+      }
+
+    } else {
+
+      if(assigned.toLowerCase()===currentUser){
+        kitchenBox.innerHTML =
+          `Assigned : <b>${assigned}</b>
+           <div class="warning" id="countdownBox"></div>`;
+        kitchenBtn.style.display="block";
+        startCountdown(activeDate);
+      } else {
+        kitchenBox.innerHTML =
+          `Assigned : <b>${assigned}</b>`;
+        kitchenBtn.style.display="none";
+      }
+
+    }
+
   });
 
-  await push(ref(db,"taskLog"),{
-    user:profileName.innerText,
-    task:"Kitchen",
-    date:todayStr,
-    time:now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
-  });
-};
+  kitchenBtn.onclick = async ()=>{
+
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+
+    const y = new Date();
+    y.setDate(y.getDate()-1);
+    const yStr = y.toISOString().split("T")[0];
+
+    const ySnap = await get(ref(db,"kitchen/"+yStr));
+
+    let targetDate = todayStr;
+
+    if(ySnap.exists()){
+      const yData = ySnap.val();
+      if(!yData.done){
+        targetDate = yStr;
+      }
+    }
+
+    await update(ref(db,"kitchen/"+targetDate),{
+      done:true,
+      doneBy:profileName.innerText
+    });
+
+    await push(ref(db,"taskLog"),{
+      user:profileName.innerText,
+      task:"Kitchen",
+      date:todayStr,
+      time:now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+    });
+  };
 }
 
 
