@@ -1,106 +1,170 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Home Task Manager</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body{font-family:Arial;background:#f4f6f8;padding:15px}
-.card{background:#fff;padding:20px;border-radius:10px;margin-bottom:15px}
-button{padding:10px 15px;border:none;border-radius:6px;background:#4caf50;color:#fff}
-.hidden{display:none}
-.header{display:flex;justify-content:space-between;background:#fff;padding:15px;border-radius:10px;margin-bottom:15px;font-weight:bold}
-.warning{background:#fff3cd;padding:10px;border-radius:6px;margin-top:8px;font-size:13px}
+body { font-family: Arial; background:#f4f6f8; padding:15px; }
+
+.header {
+  display:flex; justify-content:space-between; align-items:center;
+  background:#fff; padding:15px; border-radius:10px; margin-bottom:15px;
+  font-weight:bold;
+}
+.header-right { display:flex; align-items:center; gap:12px; }
+
+.menu { position:relative }
+#menuBtn { font-size:20px; cursor:pointer; }
+.menu-box {
+  position:absolute; right:0; top:28px;
+  background:white; border-radius:6px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+  min-width:100px;
+}
+.menu-box div { padding:10px; cursor:pointer; }
+.menu-box div:hover { background:#f2f2f2 }
+
+.card {
+  background:white; padding:20px;
+  margin-bottom:15px; border-radius:10px;
+}
+button {
+  padding:10px 16px; border:none;
+  border-radius:6px; background:#4caf50; color:white;
+}
+.hidden { display:none }
+
+.warning {
+  margin-top:8px;
+  padding:10px;
+  background:#fff3cd;
+  color:#856404;
+  border-radius:6px;
+  font-size:13px;
+}
+
+.log-header {
+  cursor:pointer; display:flex;
+  justify-content:space-between; align-items:center;
+}
+.log-row {
+  padding:6px 0; border-bottom:1px solid #eee;
+  font-size:14px;
+}
+.log-row:last-child { border-bottom:none }
 </style>
 </head>
 
 <body>
 
 <div id="loginCard" class="card">
-<h3>Login</h3>
-<input id="uid" placeholder="User ID"><br><br>
-<input id="pwd" type="password" placeholder="Password"><br><br>
-<button onclick="login()">Login</button>
-<p id="err" style="color:red"></p>
+  <h3>Login</h3>
+  <input id="uid" placeholder="User ID"><br><br>
+  <input id="pwd" type="password" placeholder="Password"><br><br>
+  <button id="loginBtn">Login</button>
+  <p id="err" style="color:red"></p>
 </div>
 
 <div id="dash" class="hidden">
 
-<div class="header">
-<div id="profileName"></div>
-<div>Fine: ₹<span id="fineBox">0</span></div>
-</div>
+  <div class="header">
+    <div id="profileName"></div>
+    <div class="header-right">
+      <div id="fineBox">₹0</div>
+      <div class="menu">
+        <div id="menuBtn">⋮</div>
+        <div id="menuBox" class="menu-box hidden">
+          <div id="logoutBtn">Logout</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-<div class="card">
-<h3>🍽 Kitchen</h3>
-<div id="kitchenBox"></div>
-<button id="kitchenBtn" class="hidden">Mark Completed</button>
-</div>
+  <div class="card">
+    <h3>🍽 Kitchen</h3>
+    <div id="kitchenBox"></div>
+    <button id="kitchenBtn" class="hidden">Mark Completed</button>
+  </div>
+
+  <div class="card">
+    <h3>🗑 Garbage</h3>
+    <p id="garbageText"></p>
+    <button id="garbageBtn">Mark Completed</button>
+  </div>
+
+  <div class="card">
+    <div class="log-header" id="fineToggle">
+      <h3>💰 Fine Log</h3><span id="fineArrow">▼</span>
+    </div>
+    <div id="fineLog" class="hidden"></div>
+  </div>
+
+  <div class="card">
+    <div class="log-header" id="taskToggle">
+      <h3>📜 Task Log</h3><span id="taskArrow">▼</span>
+    </div>
+    <div id="taskLog" class="hidden"></div>
+  </div>
 
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getDatabase, ref, get, set, update, onValue } 
+import { getDatabase, ref, get, set, update, onValue, push } 
 from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 
 const firebaseConfig = {
-apiKey: "AIzaSyClGRnMuCTZTIMXaA41bUEezlFUsfnEr9A",
-authDomain: "mmdb-1794d.firebaseapp.com",
-databaseURL: "https://mmdb-1794d-default-rtdb.asia-southeast1.firebasedatabase.app",
-projectId: "mmdb-1794d"
+  apiKey: "AIzaSyClGRnMuCTZTIMXaA41bUEezlFUsfnEr9A",
+  authDomain: "mmdb-1794d.firebaseapp.com",
+  databaseURL: "https://mmdb-1794d-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "mmdb-1794d"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 const people = ["Vedant","Pratik","Omkar","Yash"];
-
-/* CHANGE START DATE IF NEEDED */
+const garbageOrder = ["Omkar","Yash","Vedant","Pratik"];
 const START_DATE = new Date("2025-02-01T18:00:00");
 
-let currentUser=null;
+let currentUser = null;
 
-window.login = async function(){
-const id = uid.value.toLowerCase();
-const snap = await get(ref(db,"users/"+id));
-if(!snap.exists() || snap.val().pass !== pwd.value){
-err.innerText="Invalid login";
-return;
-}
-currentUser=id;
-profileName.innerText=id.charAt(0).toUpperCase()+id.slice(1);
-loginCard.classList.add("hidden");
-dash.classList.remove("hidden");
+/* LOGIN */
+loginBtn.onclick = async ()=>{
+  const id = uid.value.toLowerCase();
+  const snap = await get(ref(db,"users/"+id));
+  if(!snap.exists() || snap.val().pass !== pwd.value){
+    err.innerText="Invalid login";
+    return;
+  }
+  currentUser = id;
+  profileName.innerText=id.charAt(0).toUpperCase()+id.slice(1);
+  loginCard.classList.add("hidden");
+  dash.classList.remove("hidden");
 
-onValue(ref(db,"users/"+id+"/fine"),s=>{
-fineBox.innerText=s.val()||0;
-});
+  onValue(ref(db,"users/"+id+"/fine"),s=>{
+    fineBox.innerText="₹"+(s.val()||0);
+  });
 
-handleKitchen();
+  handleKitchen();
+  handleGarbage();
+  handleFineLog();
+  handleTaskLog();
 };
 
-/* ================= KITCHEN LOGIC ================= */
+/* ================== KITCHEN ================== */
 
-function getCycleNumber(){
-const now = new Date();
-return Math.floor((now - START_DATE)/(1000*60*60*24));
+function getCycle(){
+  return Math.floor((new Date()-START_DATE)/(1000*60*60*24));
+}
+
+function getCycleStart(cycle){
+  return new Date(START_DATE.getTime()+cycle*24*60*60*1000);
 }
 
 function handleKitchen(){
-
-  const START_DATE = new Date("2025-02-01T18:00:00");
-
-  function getCycleNumber(){
-    const now = new Date();
-    return Math.floor((now - START_DATE)/(1000*60*60*24));
-  }
-
-  function getCycleStart(){
-    const cycle = getCycleNumber();
-    return new Date(START_DATE.getTime() + cycle*24*60*60*1000);
-  }
 
   onValue(ref(db,"kitchen"), async snap=>{
 
@@ -109,79 +173,56 @@ function handleKitchen(){
     const fineCycle = data.fineCycle ?? -1;
 
     const now = new Date();
-    const cycle = getCycleNumber();
-    const cycleStart = getCycleStart();
+    const cycle = getCycle();
+    const cycleStart = getCycleStart(cycle);
 
     const assigned = people[cycle % people.length];
     const nextPerson = people[(cycle+1)%people.length];
 
-    const deadline12 = new Date(cycleStart.getTime() + 18*60*60*1000); // +18h
-    const hardShift6 = new Date(cycleStart.getTime() + 24*60*60*1000); // +24h
+    const deadline12 = new Date(cycleStart.getTime()+18*60*60*1000);
+    const hardShift6 = new Date(cycleStart.getTime()+24*60*60*1000);
 
-    /* -------- FINE AT 12 PM -------- */
+    /* Fine */
     if(now >= deadline12 && fineCycle !== cycle && lastCompletedCycle !== cycle){
-
-      await update(ref(db,"kitchen"),{
-        fineCycle:cycle
-      });
-
+      await update(ref(db,"kitchen"),{fineCycle:cycle});
       const fineRef = ref(db,"users/"+assigned.toLowerCase()+"/fine");
       const f = await get(fineRef);
       await set(fineRef,(f.val()||0)+50);
     }
 
-    /* -------- HARD SHIFT AT 6 PM -------- */
-    if(now >= hardShift6){
-      // automatically next cycle handled by cycle calc
-    }
-
-    /* -------- DISPLAY LOGIC -------- */
-
     if(lastCompletedCycle === cycle){
-
-      // Show DONE until next 12 PM
       if(now < deadline12){
-
         kitchenBox.innerHTML =
-          `<b>${assigned}</b> : DONE ✅<br>
-           Next : <b>${nextPerson}</b>`;
-
-      } else {
-
+        `<b>${assigned}</b> : DONE ✅<br>
+         Next : <b>${nextPerson}</b>`;
+      }else{
         kitchenBox.innerHTML =
-          `Assigned : <b>${nextPerson}</b>`;
+        `Assigned : <b>${nextPerson}</b>`;
       }
-
-      kitchenBtn.style.display="none";
-
-    } else {
-
+      kitchenBtn.classList.add("hidden");
+    }
+    else{
       kitchenBox.innerHTML =
-        `Assigned : <b>${assigned}</b>
-         <div class="warning">
-         Task starts 6 PM<br>
-         Fine at 12 PM<br>
-         Hard shift at 6 PM
-         </div>`;
-
-      if(currentUser === assigned.toLowerCase() && now >= cycleStart){
-        kitchenBtn.style.display="block";
-      } else {
-        kitchenBtn.style.display="none";
+      `Assigned : <b>${assigned}</b>
+       <div class="warning">
+       Task Start: 6 PM<br>
+       Fine: 12 PM<br>
+       Hard Shift: 6 PM
+       </div>`;
+      if(currentUser===assigned.toLowerCase() && now>=cycleStart){
+        kitchenBtn.classList.remove("hidden");
+      }else{
+        kitchenBtn.classList.add("hidden");
       }
     }
 
   });
 
-  /* -------- MARK DONE -------- */
   kitchenBtn.onclick = async ()=>{
-
-    const cycle = getCycleNumber();
-
+    const cycle = getCycle();
     await update(ref(db,"kitchen"),{
       lastCompletedCycle:cycle
     });
-
     await push(ref(db,"taskLog"),{
       user:profileName.innerText,
       task:"Kitchen",
@@ -190,62 +231,81 @@ function handleKitchen(){
     });
   };
 }
-/* -------- HARD SHIFT -------- */
-if(now >= hardShift6){
-return; // next cycle auto handled by cycle calc
+
+/* ================== GARBAGE ================== */
+
+function handleGarbage(){
+  onValue(ref(db,"garbage/index"),s=>{
+    const index=s.val()??0;
+    const person=garbageOrder[index];
+    garbageText.innerHTML=`Current turn: <b>${person}</b>`;
+    garbageBtn.style.display=
+      person.toLowerCase()===currentUser?"block":"none";
+  });
+
+  garbageBtn.onclick=async()=>{
+    const s=await get(ref(db,"garbage/index"));
+    const next=((s.val()??0)+1)%garbageOrder.length;
+    await set(ref(db,"garbage/index"),next);
+    await push(ref(db,"taskLog"),{
+      user:profileName.innerText,
+      task:"Garbage",
+      date:new Date().toLocaleDateString(),
+      time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+    });
+  };
 }
 
-/* -------- FINE CHECK -------- */
-if(now >= deadline12 && fineCycle !== cycle && lastCompletedCycle !== cycle){
-await update(ref(db,"kitchen"),{
-fineCycle:cycle
+/* ================== FINE LOG ================== */
+
+function handleFineLog(){
+  fineToggle.onclick=()=>{
+    fineLog.classList.toggle("hidden");
+    fineArrow.innerText=
+    fineLog.classList.contains("hidden")?"▼":"▲";
+  };
+  onValue(ref(db,"users"),s=>{
+    fineLog.innerHTML="";
+    const u=s.val()||{};
+    Object.keys(u).forEach(x=>{
+      fineLog.innerHTML+=
+      `<div class="log-row">
+      ${x.charAt(0).toUpperCase()+x.slice(1)} : ₹${u[x].fine||0}
+      </div>`;
+    });
+  });
+}
+
+/* ================== TASK LOG ================== */
+
+function handleTaskLog(){
+  taskToggle.onclick=()=>{
+    taskLog.classList.toggle("hidden");
+    taskArrow.innerText=
+    taskLog.classList.contains("hidden")?"▼":"▲";
+  };
+  onValue(ref(db,"taskLog"),s=>{
+    taskLog.innerHTML="";
+    const data=s.val()||{};
+    Object.values(data).reverse().forEach(e=>{
+      taskLog.innerHTML+=
+      `<div class="log-row">
+      <b>${e.user}</b> ${e.task==="Kitchen"?"cleaned kitchen":"threw garbage"}
+      on ${e.date} at ${e.time}
+      </div>`;
+    });
+  });
+}
+
+/* MENU */
+menuBtn.onclick=()=>menuBox.classList.toggle("hidden");
+document.addEventListener("click",e=>{
+  if(!e.target.closest(".menu"))menuBox.classList.add("hidden");
 });
-const fineRef = ref(db,"users/"+assigned.toLowerCase()+"/fine");
-const f = await get(fineRef);
-await set(fineRef,(f.val()||0)+50);
-}
-
-/* -------- DISPLAY -------- */
-
-if(lastCompletedCycle === cycle){
-
-kitchenBox.innerHTML =
-`<b>${assigned}</b> : DONE ✅<br>
-Next : <b>${people[(cycle+1)%people.length]}</b>`;
-
-kitchenBtn.classList.add("hidden");
-
-}else{
-
-kitchenBox.innerHTML =
-`Assigned : <b>${assigned}</b>
-<div class="warning">
-Task started 6 PM<br>
-Deadline 12 PM<br>
-Hard shift 6 PM
-</div>`;
-
-if(currentUser === assigned.toLowerCase() && now >= cycleStart){
-kitchenBtn.classList.remove("hidden");
-}else{
-kitchenBtn.classList.add("hidden");
-}
-
-}
-
-});
-
-/* MARK DONE */
-kitchenBtn.onclick = async ()=>{
-const cycle = getCycleNumber();
-await update(ref(db,"kitchen"),{
-lastCompletedCycle:cycle
-});
+logoutBtn.onclick=()=>{
+  location.reload();
 };
 
-}
-
 </script>
-
 </body>
 </html>
