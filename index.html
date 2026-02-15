@@ -262,7 +262,23 @@ function handleKitchen(){
   const now = new Date();
   const todayStr = now.toISOString().split("T")[0];
 
-  await update(ref(db,"kitchen/"+todayStr),{
+  const y = new Date();
+  y.setDate(y.getDate()-1);
+  const yStr = y.toISOString().split("T")[0];
+
+  const ySnap = await get(ref(db,"kitchen/"+yStr));
+
+  let targetDate = todayStr;
+
+  // If yesterday exists and not done → mark yesterday instead
+  if(ySnap.exists()){
+    const yData = ySnap.val();
+    if(!yData.done){
+      targetDate = yStr;
+    }
+  }
+
+  await update(ref(db,"kitchen/"+targetDate),{
     done:true,
     doneBy:profileName.innerText
   });
@@ -274,7 +290,6 @@ function handleKitchen(){
     time:now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
   });
 };
-}
 
 
 /* COUNTDOWN */
