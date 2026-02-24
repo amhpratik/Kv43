@@ -194,19 +194,26 @@ function getCycleStart(cycle){
 
     /* ===== 12 PM FINE ===== */
 
-    const today12 = new Date();
-    today12.setHours(FINE_HOUR,0,0,0);
 
-    if(now >= today12 && !done && lastFineDate !== todayStr){
+    let fineAppliedToday = false;
+    
+    if(
+  now >= today12 &&
+  !done &&
+  (!lastFineDate || lastFineDate !== todayStr) &&
+  !fineAppliedToday
+){
 
-      const fineRef = ref(db,"users/"+assigned.toLowerCase()+"/fine");
-      const f = await get(fineRef);
-      await set(fineRef,(f.val()||0)+50);
+  fineAppliedToday = true;
 
-      await update(ref(db,"kitchen"),{
-        lastFineDate: todayStr
-      });
-    }
+  const fineRef = ref(db,"users/"+assigned.toLowerCase()+"/fine");
+  const f = await get(fineRef);
+  await set(fineRef,(f.val()||0)+50);
+
+  await update(ref(db,"kitchen"),{
+    lastFineDate: todayStr
+  });
+}
 
     /* ===== 6 PM SHIFT ===== */
 
