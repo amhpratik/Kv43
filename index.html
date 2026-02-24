@@ -164,11 +164,10 @@ function getCycleStart(cycle){
   return new Date(START_DATE.getTime()+cycle*24*60*60*1000);
 }
 
-  
   function handleKitchen(){
 
   const FINE_HOUR = 12;
-  const SHIFT_HOUR = 18; // 6 PM
+  const SHIFT_HOUR = 18;
 
   onValue(ref(db,"kitchen"), async snap=>{
 
@@ -176,25 +175,25 @@ function getCycleStart(cycle){
 
     if(!data){
       data = {
-        lastDoneIndex:-1,
-        done:false,
-        lastFineDate:null
+        currentIndex: 0,
+        done: false,
+        lastFineDate: null
       };
       await set(ref(db,"kitchen"),data);
     }
 
-    let lastDoneIndex = data.lastDoneIndex ?? -1;
+    let currentIndex = data.currentIndex ?? 0;
     let done = data.done ?? false;
     let lastFineDate = data.lastFineDate ?? null;
 
     const now = new Date();
     const todayStr = now.toISOString().split("T")[0];
 
-    const currentIndex = (lastDoneIndex + 1) % people.length;
     const assigned = people[currentIndex];
     const nextPerson = people[(currentIndex+1)%people.length];
 
     /* ===== 12 PM FINE ===== */
+
     const today12 = new Date();
     today12.setHours(FINE_HOUR,0,0,0);
 
@@ -205,20 +204,21 @@ function getCycleStart(cycle){
       await set(fineRef,(f.val()||0)+50);
 
       await update(ref(db,"kitchen"),{
-        lastFineDate:todayStr
+        lastFineDate: todayStr
       });
     }
 
     /* ===== 6 PM SHIFT ===== */
+
     const today6 = new Date();
     today6.setHours(SHIFT_HOUR,0,0,0);
 
     if(now >= today6 && done){
 
       await update(ref(db,"kitchen"),{
-        lastDoneIndex:currentIndex,
-        done:false,
-        lastFineDate:null
+        currentIndex: (currentIndex+1)%people.length,
+        done: false,
+        lastFineDate: null
       });
 
       return;
@@ -234,27 +234,29 @@ function getCycleStart(cycle){
 
       kitchenBtn.style.display="none";
 
-    }else{
+    } else {
 
       kitchenBox.innerHTML =
         `Assigned : <b>${assigned}</b>
          <div class="warning">
-         Fine daily at 12 PM until completed.
+         ₹50 fine every day at 12 PM until completed.
          </div>`;
 
       if(currentUser === assigned.toLowerCase()){
         kitchenBtn.style.display="block";
-      }else{
+      } else {
         kitchenBtn.style.display="none";
       }
     }
 
   });
 
+  /* ===== MARK DONE ===== */
+
   kitchenBtn.onclick = async ()=>{
 
     await update(ref(db,"kitchen"),{
-      done:true
+      done: true
     });
 
     await push(ref(db,"taskLog"),{
@@ -266,6 +268,8 @@ function getCycleStart(cycle){
   };
 
   }
+  
+  
 
 /* ================== GARBAGE ================== */
 
@@ -290,6 +294,7 @@ function handleGarbage(){
     });
   };
 }
+
 
 /* ================== FINE LOG ================== */
 
