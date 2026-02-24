@@ -190,7 +190,7 @@ function handleKitchen(){
 
       const fineRef = ref(db,"users/"+assigned.toLowerCase()+"/fine");
       const f = await get(fineRef);
-      await set(fineRef,(f.val()||0)+50);
+      await set(fineRef,(f.val()||0)+100);
 
       await update(ref(db,"kitchen"),{
         lastFineDate: todayStr
@@ -220,7 +220,7 @@ function handleKitchen(){
       kitchenBox.innerHTML =
         `Assigned : <b>${assigned}</b>
          <div style="margin-top:8px;color:#856404;">
-         ₹50 fine daily at 12 PM until completed.
+         ₹100 fine daily at 12 PM until completed.
          </div>`;
       kitchenBtn.style.display =
         currentUser === assigned.toLowerCase() ? "block" : "none";
