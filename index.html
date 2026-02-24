@@ -36,15 +36,6 @@ button {
 }
 .hidden { display:none }
 
-.warning {
-  margin-top:8px;
-  padding:10px;
-  background:#fff3cd;
-  color:#856404;
-  border-radius:6px;
-  font-size:13px;
-}
-
 .log-header {
   cursor:pointer; display:flex;
   justify-content:space-between; align-items:center;
@@ -61,8 +52,8 @@ button {
 
 <div id="loginCard" class="card">
   <h3>Login</h3>
-  <input id="uid" placeholder="User ID"><br><br>
-  <input id="pwd" type="password" placeholder="Password"><br><br>
+  <input id="uid" placeholder="User ID">
+  <input id="pwd" type="password" placeholder="Password">
   <button id="loginBtn">Login</button>
   <p id="err" style="color:red"></p>
 </div>
@@ -85,7 +76,7 @@ button {
   <div class="card">
     <h3>🍽 Kitchen</h3>
     <div id="kitchenBox"></div>
-    <button id="kitchenBtn" class="hidden">Mark Completed</button>
+    <button id="kitchenBtn">Mark Completed</button>
   </div>
 
   <div class="card">
@@ -116,7 +107,7 @@ import { getDatabase, ref, get, set, update, onValue, push }
 from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyClGRnMuCTZTIMXaA41bUEezlFUsfnEr9A",
+  apiKey: "YOUR_KEY",
   authDomain: "mmdb-1794d.firebaseapp.com",
   databaseURL: "https://mmdb-1794d-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "mmdb-1794d"
@@ -127,24 +118,32 @@ const db = getDatabase(app);
 
 const people = ["Vedant","Pratik","Omkar","Yash"];
 const garbageOrder = ["Omkar","Yash","Vedant","Pratik"];
-const START_DATE = new Date("2025-02-01T18:00:00");
 
-let currentUser = null;
+let currentUser = localStorage.getItem("user");
+let fineLock = false;
+
+if(currentUser) showDashboard();
 
 /* LOGIN */
-loginBtn.onclick = async ()=>{
+loginBtn.onclick = async()=>{
   const id = uid.value.toLowerCase();
   const snap = await get(ref(db,"users/"+id));
   if(!snap.exists() || snap.val().pass !== pwd.value){
-    err.innerText="Invalid login";
-    return;
+    err.innerText="Invalid login"; return;
   }
-  currentUser = id;
-  profileName.innerText=id.charAt(0).toUpperCase()+id.slice(1);
+  currentUser=id;
+  localStorage.setItem("user",id);
+  showDashboard();
+};
+
+function showDashboard(){
   loginCard.classList.add("hidden");
   dash.classList.remove("hidden");
 
-  onValue(ref(db,"users/"+id+"/fine"),s=>{
+  profileName.innerText =
+    currentUser.charAt(0).toUpperCase()+currentUser.slice(1);
+
+  onValue(ref(db,"users/"+currentUser+"/fine"),s=>{
     fineBox.innerText="₹"+(s.val()||0);
   });
 
@@ -152,19 +151,11 @@ loginBtn.onclick = async ()=>{
   handleGarbage();
   handleFineLog();
   handleTaskLog();
-};
-
-/* ================== KITCHEN ================== */
-
-function getCycle(){
-  return Math.floor((new Date()-START_DATE)/(1000*60*60*24));
 }
 
-function getCycleStart(cycle){
-  return new Date(START_DATE.getTime()+cycle*24*60*60*1000);
-}
+/* ================= KITCHEN ================= */
 
-  function handleKitchen(){
+function handleKitchen(){
 
   const FINE_HOUR = 12;
   const SHIFT_HOUR = 18;
@@ -174,97 +165,70 @@ function getCycleStart(cycle){
     let data = snap.val();
 
     if(!data){
-      data = {
-        currentIndex: 0,
-        done: false,
-        lastFineDate: null
-      };
-      await set(ref(db,"kitchen"),data);
+      await set(ref(db,"kitchen"),{
+        currentIndex:0,
+        done:false,
+        lastFineDate:null
+      });
+      return;
     }
 
-    let currentIndex = data.currentIndex ?? 0;
-    let done = data.done ?? false;
-    let lastFineDate = data.lastFineDate ?? null;
-
-    const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
+    let {currentIndex, done, lastFineDate} = data;
 
     const assigned = people[currentIndex];
     const nextPerson = people[(currentIndex+1)%people.length];
 
-    /* ===== 12 PM FINE ===== */
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
 
+    /* 12 PM FINE */
+    const today12 = new Date();
+    today12.setHours(FINE_HOUR,0,0,0);
 
-    let fineAppliedToday = false;
-    
-    if(
-  now >= today12 &&
-  !done &&
-  (!lastFineDate || lastFineDate !== todayStr) &&
-  !fineAppliedToday
-){
+    if(now >= today12 && !done && lastFineDate !== todayStr && !fineLock){
+      fineLock = true;
 
-  fineAppliedToday = true;
+      const fineRef = ref(db,"users/"+assigned.toLowerCase()+"/fine");
+      const f = await get(fineRef);
+      await set(fineRef,(f.val()||0)+50);
 
-  const fineRef = ref(db,"users/"+assigned.toLowerCase()+"/fine");
-  const f = await get(fineRef);
-  await set(fineRef,(f.val()||0)+50);
+      await update(ref(db,"kitchen"),{
+        lastFineDate: todayStr
+      });
+    }
 
-  await update(ref(db,"kitchen"),{
-    lastFineDate: todayStr
-  });
-}
-
-    /* ===== 6 PM SHIFT ===== */
-
+    /* 6 PM SHIFT */
     const today6 = new Date();
     today6.setHours(SHIFT_HOUR,0,0,0);
 
     if(now >= today6 && done){
-
       await update(ref(db,"kitchen"),{
-        currentIndex: (currentIndex+1)%people.length,
-        done: false,
-        lastFineDate: null
+        currentIndex:(currentIndex+1)%people.length,
+        done:false,
+        lastFineDate:null
       });
-
       return;
     }
 
-    /* ===== DISPLAY ===== */
-
+    /* DISPLAY */
     if(done){
-
       kitchenBox.innerHTML =
         `<b>${assigned}</b> : DONE ✅<br>
          Next : <b>${nextPerson}</b>`;
-
       kitchenBtn.style.display="none";
-
-    } else {
-
+    }else{
       kitchenBox.innerHTML =
         `Assigned : <b>${assigned}</b>
-         <div class="warning">
-         ₹50 fine every day at 12 PM until completed.
+         <div style="margin-top:8px;color:#856404;">
+         ₹50 fine daily at 12 PM until completed.
          </div>`;
-
-      if(currentUser === assigned.toLowerCase()){
-        kitchenBtn.style.display="block";
-      } else {
-        kitchenBtn.style.display="none";
-      }
+      kitchenBtn.style.display =
+        currentUser === assigned.toLowerCase() ? "block" : "none";
     }
-
   });
 
-  /* ===== MARK DONE ===== */
-
-  kitchenBtn.onclick = async ()=>{
-
-    await update(ref(db,"kitchen"),{
-      done: true
-    });
+  kitchenBtn.onclick = async()=>{
+    await update(ref(db,"kitchen"),{ done:true });
 
     await push(ref(db,"taskLog"),{
       user:profileName.innerText,
@@ -273,12 +237,9 @@ function getCycleStart(cycle){
       time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
     });
   };
+}
 
-  }
-  
-  
-
-/* ================== GARBAGE ================== */
+/* ================= GARBAGE ================= */
 
 function handleGarbage(){
   onValue(ref(db,"garbage/index"),s=>{
@@ -293,6 +254,7 @@ function handleGarbage(){
     const s=await get(ref(db,"garbage/index"));
     const next=((s.val()??0)+1)%garbageOrder.length;
     await set(ref(db,"garbage/index"),next);
+
     await push(ref(db,"taskLog"),{
       user:profileName.innerText,
       task:"Garbage",
@@ -302,44 +264,39 @@ function handleGarbage(){
   };
 }
 
+/* ================= LOGS ================= */
 
-/* ================== FINE LOG ================== */
+fineToggle.onclick=()=>{
+  fineLog.classList.toggle("hidden");
+};
+
+taskToggle.onclick=()=>{
+  taskLog.classList.toggle("hidden");
+};
 
 function handleFineLog(){
-  fineToggle.onclick=()=>{
-    fineLog.classList.toggle("hidden");
-    fineArrow.innerText=
-    fineLog.classList.contains("hidden")?"▼":"▲";
-  };
   onValue(ref(db,"users"),s=>{
     fineLog.innerHTML="";
     const u=s.val()||{};
     Object.keys(u).forEach(x=>{
       fineLog.innerHTML+=
-      `<div class="log-row">
-      ${x.charAt(0).toUpperCase()+x.slice(1)} : ₹${u[x].fine||0}
-      </div>`;
+        `<div class="log-row">
+         ${x.charAt(0).toUpperCase()+x.slice(1)} : ₹${u[x].fine||0}
+         </div>`;
     });
   });
 }
 
-/* ================== TASK LOG ================== */
-
 function handleTaskLog(){
-  taskToggle.onclick=()=>{
-    taskLog.classList.toggle("hidden");
-    taskArrow.innerText=
-    taskLog.classList.contains("hidden")?"▼":"▲";
-  };
   onValue(ref(db,"taskLog"),s=>{
     taskLog.innerHTML="";
     const data=s.val()||{};
     Object.values(data).reverse().forEach(e=>{
       taskLog.innerHTML+=
-      `<div class="log-row">
-      <b>${e.user}</b> ${e.task==="Kitchen"?"cleaned kitchen":"threw garbage"}
-      on ${e.date} at ${e.time}
-      </div>`;
+        `<div class="log-row">
+         <b>${e.user}</b> ${e.task==="Kitchen"?"cleaned kitchen":"threw garbage"}
+         on ${e.date} at ${e.time}
+         </div>`;
     });
   });
 }
@@ -350,9 +307,10 @@ document.addEventListener("click",e=>{
   if(!e.target.closest(".menu"))menuBox.classList.add("hidden");
 });
 logoutBtn.onclick=()=>{
+  localStorage.removeItem("user");
   location.reload();
 };
-
 </script>
+
 </body>
 </html>
