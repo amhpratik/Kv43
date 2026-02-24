@@ -163,61 +163,38 @@ function getCycle(){
 function getCycleStart(cycle){
   return new Date(START_DATE.getTime()+cycle*24*60*60*1000);
 }
-function handleKitchen(){
 
-  const START_HOUR = 18; // 6 PM
-  const FINE_HOUR = 12;  // 12 PM
+  
+  function handleKitchen(){
+
+  const FINE_HOUR = 12;
+  const SHIFT_HOUR = 18; // 6 PM
 
   onValue(ref(db,"kitchen"), async snap=>{
 
     let data = snap.val();
 
     if(!data){
-      // initialize first time
       data = {
-        currentIndex:0,
+        lastDoneIndex:-1,
         done:false,
-        cycleStart:Date.now(),
         lastFineDate:null
       };
       await set(ref(db,"kitchen"),data);
     }
 
+    let lastDoneIndex = data.lastDoneIndex ?? -1;
+    let done = data.done ?? false;
+    let lastFineDate = data.lastFineDate ?? null;
+
     const now = new Date();
     const todayStr = now.toISOString().split("T")[0];
 
-    let {currentIndex, done, cycleStart, lastFineDate} = data;
-
+    const currentIndex = (lastDoneIndex + 1) % people.length;
     const assigned = people[currentIndex];
     const nextPerson = people[(currentIndex+1)%people.length];
 
-    const cycleStartDate = new Date(cycleStart);
-
-    /* ===== 6 PM ROTATION CHECK ===== */
-    const today6PM = new Date();
-    today6PM.setHours(START_HOUR,0,0,0);
-
-    if(now >= today6PM){
-
-      if(done){
-        currentIndex = (currentIndex+1)%people.length;
-        done = false;
-        lastFineDate = null;
-        cycleStart = Date.now();
-
-        await update(ref(db,"kitchen"),{
-          currentIndex,
-          done,
-          cycleStart,
-          lastFineDate
-        });
-
-        return; // wait for next render
-      }
-
-    }
-
-    /* ===== 12 PM FINE CHECK ===== */
+    /* ===== 12 PM FINE ===== */
     const today12 = new Date();
     today12.setHours(FINE_HOUR,0,0,0);
 
@@ -230,6 +207,21 @@ function handleKitchen(){
       await update(ref(db,"kitchen"),{
         lastFineDate:todayStr
       });
+    }
+
+    /* ===== 6 PM SHIFT ===== */
+    const today6 = new Date();
+    today6.setHours(SHIFT_HOUR,0,0,0);
+
+    if(now >= today6 && done){
+
+      await update(ref(db,"kitchen"),{
+        lastDoneIndex:currentIndex,
+        done:false,
+        lastFineDate:null
+      });
+
+      return;
     }
 
     /* ===== DISPLAY ===== */
@@ -259,7 +251,6 @@ function handleKitchen(){
 
   });
 
-  /* ===== MARK DONE ===== */
   kitchenBtn.onclick = async ()=>{
 
     await update(ref(db,"kitchen"),{
@@ -274,8 +265,7 @@ function handleKitchen(){
     });
   };
 
-}
-
+  }
 
 /* ================== GARBAGE ================== */
 
