@@ -163,66 +163,109 @@ function getCycle(){
 function getCycleStart(cycle){
   return new Date(START_DATE.getTime()+cycle*24*60*60*1000);
 }
-
 function handleKitchen(){
+
+  const START_HOUR = 18; // 6 PM
+  const FINE_HOUR = 12;  // 12 PM
 
   onValue(ref(db,"kitchen"), async snap=>{
 
-    const data = snap.val()||{};
-    const lastCompletedCycle = data.lastCompletedCycle ?? -1;
-    const fineCycle = data.fineCycle ?? -1;
+    let data = snap.val();
+
+    if(!data){
+      // initialize first time
+      data = {
+        currentIndex:0,
+        done:false,
+        cycleStart:Date.now(),
+        lastFineDate:null
+      };
+      await set(ref(db,"kitchen"),data);
+    }
 
     const now = new Date();
-    const cycle = getCycle();
-    const cycleStart = getCycleStart(cycle);
+    const todayStr = now.toISOString().split("T")[0];
 
-    const assigned = people[cycle % people.length];
-    const nextPerson = people[(cycle+1)%people.length];
+    let {currentIndex, done, cycleStart, lastFineDate} = data;
 
-    const deadline12 = new Date(cycleStart.getTime()+18*60*60*1000);
-    const hardShift6 = new Date(cycleStart.getTime()+24*60*60*1000);
+    const assigned = people[currentIndex];
+    const nextPerson = people[(currentIndex+1)%people.length];
 
-    /* Fine */
-    if(now >= deadline12 && fineCycle !== cycle && lastCompletedCycle !== cycle){
-      await update(ref(db,"kitchen"),{fineCycle:cycle});
+    const cycleStartDate = new Date(cycleStart);
+
+    /* ===== 6 PM ROTATION CHECK ===== */
+    const today6PM = new Date();
+    today6PM.setHours(START_HOUR,0,0,0);
+
+    if(now >= today6PM){
+
+      if(done){
+        currentIndex = (currentIndex+1)%people.length;
+        done = false;
+        lastFineDate = null;
+        cycleStart = Date.now();
+
+        await update(ref(db,"kitchen"),{
+          currentIndex,
+          done,
+          cycleStart,
+          lastFineDate
+        });
+
+        return; // wait for next render
+      }
+
+    }
+
+    /* ===== 12 PM FINE CHECK ===== */
+    const today12 = new Date();
+    today12.setHours(FINE_HOUR,0,0,0);
+
+    if(now >= today12 && !done && lastFineDate !== todayStr){
+
       const fineRef = ref(db,"users/"+assigned.toLowerCase()+"/fine");
       const f = await get(fineRef);
       await set(fineRef,(f.val()||0)+50);
+
+      await update(ref(db,"kitchen"),{
+        lastFineDate:todayStr
+      });
     }
 
-    if(lastCompletedCycle === cycle){
-      if(now < deadline12){
-        kitchenBox.innerHTML =
+    /* ===== DISPLAY ===== */
+
+    if(done){
+
+      kitchenBox.innerHTML =
         `<b>${assigned}</b> : DONE ✅<br>
          Next : <b>${nextPerson}</b>`;
-      }else{
-        kitchenBox.innerHTML =
-        `Assigned : <b>${nextPerson}</b>`;
-      }
-      kitchenBtn.classList.add("hidden");
-    }
-    else{
+
+      kitchenBtn.style.display="none";
+
+    }else{
+
       kitchenBox.innerHTML =
-      `Assigned : <b>${assigned}</b>
-       <div class="warning">
-       Task Start: 6 PM<br>
-       Fine: 12 PM<br>
-       Hard Shift: 6 PM
-       </div>`;
-      if(currentUser===assigned.toLowerCase() && now>=cycleStart){
-        kitchenBtn.classList.remove("hidden");
+        `Assigned : <b>${assigned}</b>
+         <div class="warning">
+         Fine daily at 12 PM until completed.
+         </div>`;
+
+      if(currentUser === assigned.toLowerCase()){
+        kitchenBtn.style.display="block";
       }else{
-        kitchenBtn.classList.add("hidden");
+        kitchenBtn.style.display="none";
       }
     }
 
   });
 
+  /* ===== MARK DONE ===== */
   kitchenBtn.onclick = async ()=>{
-    const cycle = getCycle();
+
     await update(ref(db,"kitchen"),{
-      lastCompletedCycle:cycle
+      done:true
     });
+
     await push(ref(db,"taskLog"),{
       user:profileName.innerText,
       task:"Kitchen",
@@ -230,7 +273,9 @@ function handleKitchen(){
       time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
     });
   };
+
 }
+
 
 /* ================== GARBAGE ================== */
 
