@@ -198,17 +198,30 @@ function handleKitchen(){
     }
 
     /* 6 PM SHIFT */
-    const today6 = new Date();
-    today6.setHours(SHIFT_HOUR,0,0,0);
+    /* AUTO 6 PM SHIFT CHECK */
+setInterval(async () => {
 
-    if(now >= today6 && done){
-      await update(ref(db,"kitchen"),{
-        currentIndex:(currentIndex+1)%people.length,
-        done:false,
-        lastFineDate:null
-      });
-      return;
-    }
+  const snap = await get(ref(db,"kitchen"));
+  if(!snap.exists()) return;
+
+  const data = snap.val();
+  if(!data.done) return;
+
+  const now = new Date();
+  const today6 = new Date();
+  today6.setHours(18,0,0,0);
+
+  if(now >= today6){
+
+    await update(ref(db,"kitchen"),{
+      currentIndex:(data.currentIndex+1)%people.length,
+      done:false,
+      lastFineDate:null
+    });
+
+  }
+
+}, 60000); // check every 1 minute
 
     /* DISPLAY */
     if(done){
