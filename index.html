@@ -233,6 +233,7 @@ function handleKitchen(){
 
 
   /* GLOBAL 6 PM SHIFT CHECK */
+
 setInterval(async () => {
 
   const snap = await get(ref(db,"kitchen"));
@@ -242,15 +243,18 @@ setInterval(async () => {
   if(!data.done) return;
 
   const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+
   const today6 = new Date();
   today6.setHours(18,0,0,0);
 
-  if(now >= today6){
+  if(now >= today6 && data.lastShiftDate !== todayStr){
 
     await update(ref(db,"kitchen"),{
       currentIndex:(data.currentIndex+1)%people.length,
       done:false,
-      lastFineDate:null
+      lastFineDate:null,
+      lastShiftDate: todayStr
     });
 
   }
