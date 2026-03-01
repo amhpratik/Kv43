@@ -197,31 +197,7 @@ function handleKitchen(){
       });
     }
 
-    /* 6 PM SHIFT */
-    /* AUTO 6 PM SHIFT CHECK */
-setInterval(async () => {
-
-  const snap = await get(ref(db,"kitchen"));
-  if(!snap.exists()) return;
-
-  const data = snap.val();
-  if(!data.done) return;
-
-  const now = new Date();
-  const today6 = new Date();
-  today6.setHours(18,0,0,0);
-
-  if(now >= today6){
-
-    await update(ref(db,"kitchen"),{
-      currentIndex:(data.currentIndex+1)%people.length,
-      done:false,
-      lastFineDate:null
-    });
-
-  }
-
-}, 60000); // check every 1 minute
+    
 
     /* DISPLAY */
     if(done){
@@ -252,6 +228,37 @@ setInterval(async () => {
   };
 }
 
+
+
+
+
+  /* GLOBAL 6 PM SHIFT CHECK */
+setInterval(async () => {
+
+  const snap = await get(ref(db,"kitchen"));
+  if(!snap.exists()) return;
+
+  const data = snap.val();
+  if(!data.done) return;
+
+  const now = new Date();
+  const today6 = new Date();
+  today6.setHours(18,0,0,0);
+
+  if(now >= today6){
+
+    await update(ref(db,"kitchen"),{
+      currentIndex:(data.currentIndex+1)%people.length,
+      done:false,
+      lastFineDate:null
+    });
+
+  }
+
+}, 60000);
+
+
+  
 /* ================= GARBAGE ================= */
 
 function handleGarbage(){
