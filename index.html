@@ -197,7 +197,22 @@ function handleKitchen(){
       });
     }
 
-    
+    /* ================= FORCE SHIFT CHECK ================= */
+
+const today6 = new Date();
+today6.setHours(18,0,0,0);
+
+if(now >= today6 && done && data.lastShiftDate !== todayStr){
+
+  await update(ref(db,"kitchen"),{
+    currentIndex:(currentIndex+1)%people.length,
+    done:false,
+    lastFineDate:null,
+    lastShiftDate: todayStr
+  });
+
+  return; // stop further execution
+}
 
     /* DISPLAY */
     if(done){
